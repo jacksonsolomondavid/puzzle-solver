@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-Puzzle Solver with State Space Tree</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            background-color: #f4f6f9;
+        }
+        h1 {
+            margin-bottom: 20px;
+        }
+        .form-container {
+            width: 80%;
+            max-width: 600px;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        input {
+            width: 50px;
+            padding: 5px;
+            margin: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        #board {
+            margin-top: 20px;
+            display: grid;
+            gap: 2px;
+        }
+        .cell {
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ddd;
+            font-weight: bold;
+        }
+        .cell:nth-child(even) {
+            background-color: #f0f0f0;
+        }
+        .cell:nth-child(odd) {
+            background-color: #fff;
+        }
+        svg {
+            margin-top: 30px;
+            border: 1px solid #ddd;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+    <h1>N-Puzzle Solver</h1>
+    <div class="form-container">
+        <label for="n">Enter Puzzle Size (N x N):</label>
+        <input type="number" id="n" min="2" max="5" value="3">
+        <button onclick="solve()">Solve Puzzle</button>
+        <button onclick="reset()">Reset</button>
+    </div>
+    <div id="board"></div>
+    <svg id="tree" width="800" height="600"></svg>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.min.js"></script>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <script>
+        const socket = io();
+        const board = document.getElementById('board');
+        const tree = d3.select('#tree');
+
+        function renderBoard(state) {
+            board.innerHTML = '';
+            const size = state.length;
+            board.style.gridTemplateColumns = `repeat(${size}, 50px)`;
+            state.flat().forEach(num => {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.textContent = num || '';
+                board.appendChild(cell);
+            });
+        }
+
+        function renderTree(data) {
+            tree.selectAll('*').remove();
+            const root = d3.hierarchy(data);
+            const treeLayout = d3.tree().size([800, 600]);
+            treeLayout(root);
+            const svg = tree.append('g').attr('transform', 'translate(50, 50)');
+
+            svg.selectAll('.link')
+                .data(root.links())
+                .enter()
+                .append('line')
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y)
+                .attr('stroke', '#ccc');
+
+            const nodes = svg.selectAll('.node')
+                .data(root.descendants())
+                .enter()
+                .append('g')
+                .attr('transform', d => `translate(${d.x},${d.y})`);
+
+            nodes.append('circle')
+                .attr('r', 15)
+                .attr('fill', '#007bff');
+
+            nodes.append('text')
+                .attr('dy', -20)
+                .attr('text-anchor', 'middle')
+                .text(d => d.data.name);
+        }
+
+        function solve() {
+            const size = document.getElementById('n').value;
+            socket.emit('solve', { N: size });
+        }
+
+        function reset() {
+            board.innerHTML = '';
+            tree.selectAll('*').remove();
+        }
+
+        socket.on('update', data => {
+            renderBoard(data.board);
+            renderTree(data.tree);
+        });
+
+        socket.on('complete', data => {
+            alert('Puzzle Solved!');
+        });
+    </script>
+</body>
+</html>
